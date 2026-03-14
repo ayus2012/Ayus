@@ -94,27 +94,30 @@ html, body {
 
 <body>
 
-<div id="membersBox"></div>
+<div id="membersBox">Loading...</div>
 
 <script>
-async function loadNewest() {
+const clubAPI = "https://api.chess.com/pub/club/anime-team-3/members";
+const savedKey = "clubJoinedMembers";
+
+async function loadMembers() {
   try {
 
-    const r = await fetch("https://api.chess.com/pub/club/anime-team-3/members");
+    const r = await fetch(clubAPI);
     const d = await r.json();
 
     const members = [...(d.weekly || []), ...(d.monthly || [])];
 
-    if (members.length === 0) {
+    if(members.length === 0){
       document.getElementById("membersBox").innerHTML =
-      '<div style="text-align:center;padding:20px;font-size:13px;opacity:.8;">No one joined yet</div>';
+      '<div style="text-align:center;padding:20px;font-size:13px;">No one joined yet</div>';
       return;
     }
 
     members.sort((a,b)=>b.joined-a.joined);
-    const top3 = members.slice(0,3);
+    const newest = members.slice(0,3);
 
-    const rows = await Promise.all(top3.map(async m=>{
+    const rows = await Promise.all(newest.map(async m=>{
 
       const [pj,stats] = await Promise.all([
         fetch("https://api.chess.com/pub/player/"+m.username).then(r=>r.json()),
@@ -151,8 +154,8 @@ async function loadNewest() {
   }
 }
 
-loadNewest();
-setInterval(loadNewest,300000);
+loadMembers();
+setInterval(loadMembers,300000);
 </script>
 
 </body>

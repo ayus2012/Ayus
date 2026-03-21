@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: linear-gradient(180deg, rgba(22,32,48,.92), rgba(14,22,34,.95));
+  border-radius: 20px;
+  font-family: Arial, Helvetica, sans-serif;
+  color: #eaf2ff;
+  overflow: hidden;
+}
+
+#membersBox {
+  padding: 12px;
+  max-height: 245px;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+#membersBox::-webkit-scrollbar { display: none; }
+
+.memberRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  border-radius: 18px;
+  background: rgba(55,85,125,.55);
+  border: 1px solid rgba(120,150,190,.25);
+  margin-bottom: 10px;
+  transition: all .25s ease;
+}
+
+/* 🔥 Glow ONLY newest */
+.memberRow.newest {
+  box-shadow: 0 0 12px rgba(126,166,255,.8),
+              0 0 25px rgba(126,166,255,.6);
+  border: 1px solid rgba(126,166,255,.9);
+}
+
+.memberRow:hover {
+  transform: translateY(-3px);
+  background: #7ea6ff;
+  color: #fff;
+  box-shadow: 0 8px 18px rgba(0,0,0,.6);
+}
+
+.memberLink {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+  width: 100%;
+  color: inherit;
+}
+
+.memberAvatar {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  border: 2px solid rgba(120,150,190,.6);
+  object-fit: cover;
+}
+
+.memberRow:hover .memberAvatar {
+  border-color: #fff;
+}
+
+.memberName {
+  font-weight: 800;
+  font-size: 12px;
+  max-width: 140px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.memberRating {
+  font-size: 11px;
+  opacity: .9;
+}
+</style>
+</head>
+
+<body>
+<div id="membersBox">Loading...</div>
+
+<script>
+let lastTop = "";
+
+async function loadNewest() {
+  try {
+    const r = await fetch("https://api.chess.com/pub/club/anime-lovers-chess-club-1/members?" + Date.now());
+    const d = await r.json();
+
+    let members = [...(d.weekly || []), ...(d.monthly || [])];
+
+    // ✅ Remove duplicates (important fix)
+    const unique = {};
+    members.forEach(m=>{
+      if(!unique[m.username] || unique[m.username].joined < m.joined){
+        unique[m.username] = m;
+      }
+    });
+    members = Object.values(unique);
+
+    // ✅ Proper newest sorting
+    members.sort((a,b)=> (b.joined||0) - (a.joined||0));
+
+    const top3 = members.slice(0,3);
+
+    const currentTop = top3.map(m=>m.username).join(",");
+    if (currentTop === lastTop) return;
+
+    lastTop = currentTop;
+
+    const rows = await Promise.all(top3.map(async (m, i)=>{
+      const [pj,stats] = await Promise.all([
+        fetch("https://api.chess.com/pub/player/"+m.username+"?"+Date.now()).then(r=>r.json()),
+        fetch("https://api.chess.com/pub/player/"+m.username+"/stats?"+Date.now()).then(r=>r.json())
+      ]);
+
+      const ratings=[
+        {t:"Rapid",v:stats.chess_rapid?.last?.rating},
+        {t:"Blitz",v:stats.chess_blitz?.last?.rating},
+        {t:"Bullet",v:stats.chess_bullet?.last?.rating},
+        {t:"Daily",v:stats.chess_daily?.last?.rating}
+      ].filter(x=>x.v);
+
+      const best = ratings.length
+          ? ratings.sort((a,b)=>b.v-a.v)[0]
+          : {t:"—",v:"—"};
+
+      return `
+      <div class="memberRow ${i===0 ? 'newest' : ''}">
+        <a class="memberLink" href="https://www.chess.com/member/${m.username}" target="_blank">
+          <img class="memberAvatar" src="${pj.avatar || 'https://taki2023.github.io/taki/default-pawn.png'}">
+          <div>
+            <div class="memberName">@${m.username}</div>
+            <div class="memberRating">${best.t}: ${best.v}</div>
+          </div>
+        </a>
+      </div>`;
+    }));
+
+    document.getElementById("membersBox").innerHTML = rows.join("");
+
+  } catch(e){
+    document.getElementById("membersBox").innerHTML="Unable to load members";
+  }
+}
+
+loadNewest();
+setInterval(loadNewest, 20000);
+</script>
+
+</body>
+  </html>
